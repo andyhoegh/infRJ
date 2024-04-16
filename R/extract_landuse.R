@@ -24,10 +24,13 @@ extract_landuse <- function( lat, long, SiteName, buffer = 100  ){
     scale = 30
   )
 
-  tmp <- landuse$getInfo()$landcover
+  landuse <- landuse2021$reduceRegion(
+    reducer = rgee::ee$Reducer$frequencyHistogram(),
+    geometry = point_buffer,
+    scale = 30
+  )
 
-  tibble::tibble(cat = names(tmp), pixels = unlist(tmp)) |>
+  tibble::tibble(cat = names(landuse$getInfo()$landcover), pixels = unlist(landuse$getInfo()$landcover)) |>
     dplyr::mutate(prop = pixels / sum(pixels),
-           SiteName = SiteName,
-           range = buffer)
-}
+                  SiteName = SiteName,
+                  range = buffer)}
