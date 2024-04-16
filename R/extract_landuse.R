@@ -10,6 +10,7 @@
 #'
 #' @examples
 #' \dontrun{
+#' rgee::ee_Initialize()
 #' extract_landuse(45.676998, -111.042931, 'Bozeman', buffer = 100)
 #' }
 extract_landuse <- function( lat, long, SiteName, buffer = 100  ){
