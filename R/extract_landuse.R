@@ -1,4 +1,20 @@
-extract_landuse <- function( lat, long, SiteName, landuse2021, buffer = 100  ){
+#' Extract land use from USGS NLCD
+#'
+#' @param lat Latitude for point
+#' @param long Longitude for point
+#' @param SiteName Name associated with point
+#' @param buffer Distance around point in meters.
+#'
+#' @return tibble with land use type and proportion
+#' @export
+#'
+#' @examples
+#' extract_landuse(45.676998, -111.042931, 'Bozeman', buffer = 100)
+extract_landuse <- function( lat, long, SiteName, buffer = 100  ){
+  landuse <- ee$ImageCollection("USGS/NLCD_RELEASES/2021_REL/NLCD")
+  start <- ee$Date$fromYMD(2021,1,1)
+  end <- ee$Date$fromYMD(2021,12,31)
+  landuse2021 = ee$Image(landuse$filterDate(start,end)$mean())
   point <- rgee::ee$Geometry$Point(long, lat)
   point_buffer <- rgee::ee$Geometry$buffer(point, buffer) # in meters
 
