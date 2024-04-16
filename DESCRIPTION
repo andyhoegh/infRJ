@@ -1,0 +1,21 @@
+Package: infRJ
+Title: Run informed RJ model selection for spatial scales
+Version: 0.0.0.9000
+Authors@R: 
+    person("Andrew", "Hoegh", , "andrew.hoegh@montana.edu", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0003-1176-4965"))
+Description: Extracts geospatial landuse data, ellicits priors over models, 
+    computes posterior model probabilities associated with concentric circles of increasing distances.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.1
+Suggests: 
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Imports: 
+    dplyr,
+    rgee,
+    tibble
+URL: https://github.com/andyhoegh/infRJ
+BugReports: https://github.com/andyhoegh/infRJ/issues
