@@ -9,3 +9,4 @@
 #'   \item{y}{ latitude}
 #' }
 #' @source Obtained from National Bridge Inventory database
+"coords"

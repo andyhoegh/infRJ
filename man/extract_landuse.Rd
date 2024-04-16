@@ -23,6 +23,7 @@ Extract land use from USGS NLCD
 }
 \examples{
 \dontrun{
+rgee::ee_Initialize()
 extract_landuse(45.676998, -111.042931, 'Bozeman', buffer = 100)
 }
 }
