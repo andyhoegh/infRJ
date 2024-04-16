@@ -19,7 +19,7 @@ extract_landuse <- function( lat, long, SiteName, buffer = 100  ){
   point_buffer <- rgee::ee$Geometry$buffer(point, buffer) # in meters
 
   landuse <- landuse2021$reduceRegion(
-    reducer = ee$Reducer$frequencyHistogram(),
+    reducer = rgee::ee$Reducer$frequencyHistogram(),
     geometry = point_buffer,
     scale = 30
   )
