@@ -9,7 +9,9 @@
 #' @export
 #'
 #' @examples
-#' '\dontrun{extract_landuse(45.676998, -111.042931, 'Bozeman', buffer = 100)}
+#' \dontrun{
+#' extract_landuse(45.676998, -111.042931, 'Bozeman', buffer = 100)
+#' }
 extract_landuse <- function( lat, long, SiteName, buffer = 100  ){
   landuse <- rgee::ee$ImageCollection("USGS/NLCD_RELEASES/2021_REL/NLCD")
   start <- rgee::ee$Date$fromYMD(2021,1,1)
