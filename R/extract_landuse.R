@@ -33,4 +33,5 @@ extract_landuse <- function( lat, long, SiteName, buffer = 100  ){
   tibble::tibble(cat = names(landuse$getInfo()$landcover), pixels = unlist(landuse$getInfo()$landcover)) |>
     dplyr::mutate(prop = pixels / sum(pixels),
                   SiteName = SiteName,
-                  range = buffer)}
+                  range = buffer)
+}
