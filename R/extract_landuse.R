@@ -11,10 +11,10 @@
 #' @examples
 #' extract_landuse(45.676998, -111.042931, 'Bozeman', buffer = 100)
 extract_landuse <- function( lat, long, SiteName, buffer = 100  ){
-  landuse <- ee$ImageCollection("USGS/NLCD_RELEASES/2021_REL/NLCD")
-  start <- ee$Date$fromYMD(2021,1,1)
-  end <- ee$Date$fromYMD(2021,12,31)
-  landuse2021 = ee$Image(landuse$filterDate(start,end)$mean())
+  landuse <- rgee::ee$ImageCollection("USGS/NLCD_RELEASES/2021_REL/NLCD")
+  start <- rgee::ee$Date$fromYMD(2021,1,1)
+  end <- rgee::ee$Date$fromYMD(2021,12,31)
+  landuse2021 = rgee::ee$Image(landuse$filterDate(start,end)$mean())
   point <- rgee::ee$Geometry$Point(long, lat)
   point_buffer <- rgee::ee$Geometry$buffer(point, buffer) # in meters
 
