@@ -1,0 +1,376 @@
+---
+title: "simulation_overview"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{simulation_overview}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup, message = F}
+library(infRJ)
+library(tidyverse)
+library(rgee)
+ee_Initialize()
+library(nimble)  
+```
+
+### Step 1. Extract Land Use from USGS NLCD
+
+Note this requires a linked google earth engine account and takes approximately 2.5 minutes to extract the proportion of area classified as "Developed" and "Planted/Cultivated" for the 100 sites.
+
+```{r extract}
+data(coords)
+coords_out <- coords |> 
+  mutate(SiteName = 1:n())
+
+# connect NLCD number to type
+key <-tibble(cat = c(11, 12,
+                       21, 22, 23, 24,
+                       31,
+                       41, 42, 43,
+                       51, 52,
+                       71, 72, 73, 74,
+                       81, 82,
+                       90, 95),
+               type = c('Open Water', "Perennial Ice/Snow",
+                        'Developed, Open Space', 'Developed, Low Intensity','Developed, Medium Intensity','Developed, High Intensity',
+                        'Barren Land (Rock/Sand/Clay)',
+                        'Deciduous Forest', "Evergreen Forest",'Mixed Forest',
+                        'Dwarf Scrub','Shrub/Scrub',
+                        'Grassland/Herbaceous','Sedge/Herbaceous','Lichens','Moss',
+                        'Pasture/Hay','Cultivated Crops',
+                        'Woody Wetlands','Emergent Herbaceous Wetlands'),
+               general_type = c('Water','Water',
+                                'Developed','Developed','Developed','Developed',
+                                'Barren',
+                                'Forest','Forest','Forest',
+                                'Shrub','Shrub',
+                                'Herbaceous','Herbaceous','Herbaceous','Herbaceous',
+                                'Planted/Cultivated','Planted/Cultivated',
+                                'Wetlands','Wetlands'
+                                ))
+
+landuse_out <- NULL
+
+#specify distances to extract
+distance_set <- seq(2500, 7500, by = 2500)
+
+for (dist in 1:length(distance_set)){
+  landuse_tmp <- NULL
+  for (i in 1:nrow(coords)){
+    landuse_tmp <- landuse_tmp %>%
+    bind_rows(extract_landuse(coords_out$y[i], coords_out$x[i], coords_out$SiteName[i], distance_set[dist]))
+  }
+  landuse_cat <- landuse_tmp %>%
+    mutate(cat = as.numeric(cat)) %>%
+    left_join(key, by = "cat") |>
+    filter(str_detect(type, "Developed"))
+
+  landuse_tmp_wide <- landuse_cat %>%
+    group_by(SiteName, general_type) %>%
+    summarize(prop = sum(prop), .groups = 'drop') %>%
+    mutate(type = paste(general_type, distance_set[dist], sep = ':')) %>%
+    pivot_wider(names_from =type, values_from = prop, values_fill = 0,
+                id_cols = SiteName)
+
+  landuse_ag <- landuse_tmp %>%
+    mutate(cat = as.numeric(cat)) %>%
+    left_join(key, by = "cat") |>
+    filter(str_detect(general_type, "Planted/Cultivated"))
+
+  landuse_ag_wide <- landuse_ag %>%
+    group_by(SiteName, general_type) %>%
+    summarize(prop = sum(prop), .groups = 'drop') %>%
+    mutate(type = paste(general_type, distance_set[dist], sep = ':')) %>%
+    pivot_wider(names_from =type, values_from = prop, values_fill = 0,
+                  id_cols = SiteName)
+  if (dist == 1) {
+    landuse_out <- landuse_tmp_wide %>%
+      full_join(landuse_ag_wide, by = "SiteName") %>%
+      mutate_if(is.numeric,coalesce,0)
+  } else{
+    landuse_out <- landuse_out %>%
+      full_join(landuse_tmp_wide, by = "SiteName") %>%
+      full_join(landuse_ag_wide, by = "SiteName")  %>%
+      mutate_if(is.numeric,coalesce,0)
+  }
+}
+```
+
+### 2. Generate Synthetic Data
+
+```{r simulate}
+X_mat <- model.matrix(~`Developed:2500` + `Developed:5000` + `Developed:7500` +
+                      `Planted/Cultivated:2500` + `Planted/Cultivated:5000` + `Planted/Cultivated:7500`, landuse_out)
+
+
+seed_in <- 1 # should be updated for addtional replications within a simulation framework
+set.seed(seed = seed_in)
+beta <-  matrix(0 ,nrow = ncol(X_mat), ncol = 1)
+beta[c(1, 3,6),1] <- 1 # intercept and coefficients at 5000 meters
+sigma <- 1
+Y <- rnorm( nrow(X_mat), as.matrix(X_mat) %*% beta, sd = sigma)
+  
+comb <- X_mat %>% bind_cols(tibble(Y = Y))
+```
+
+### 3. Set Priors
+
+```{r priors}
+# priors for beta are N(0,tau^2)
+# this requires additional thought for other scenarios
+tau <- 1
+  
+# Model priors are derived from shiny app
+priors <- c(.06, # no variables
+            .03, .12, .03, # developed only at 2.5k, 5k, 7.5k 
+            .03, .12, .03, # planted at 2.5k, 5k, 7.5k 
+            .02, .06, .02, # additive developed at 2.5k + planted at 2.5k, 5k, 7.5k
+            .06, .25, .06, # additive developed at 5k + planted at 2.5k, 5k, 7.5k
+            .02, .06, .02) # additive developed at 7.5k + planted at 2.5k, 5k, 7.5k
+num_models <- length(priors)
+```
+
+### 4. Calculate Marginal Likelihoods
+
+See supplemental information of Hoegh, et. al for mathematical derivations
+```{r marglike}
+compute_bf_mat_log <- function(Y, X, Sigma, Tau, Beta0 ){
+  N <- nrow(X)
+  p <- ncol(X)
+    
+  as.numeric(
+    log(2 * pi) * (-N/2) +
+    log(det(Sigma)) * (-1/2) +
+    log(det(Tau)) * (-1/2)  +
+    (-1/2 * (t(Y) %*% solve(Sigma) %*% Y + t(Beta0) %*% solve(Tau) %*% Beta0)) +
+    (1/2 * t(t(X) %*% solve(Sigma) %*% Y + solve(Tau) %*% Beta0) %*% 
+       solve(t(X) %*% solve(Sigma) %*% X + solve(Tau)) %*%
+       (t(X) %*% solve(Sigma) %*% Y + solve(Tau) %*% Beta0)) +
+    log(det(solve(t(X) %*% solve(Sigma) %*% X + solve(Tau)))) * (1/2)
+  )
+}
+  
+marg_log_likes <- NULL
+N <- nrow(comb)
+
+# No variables
+marg_log_likes[1] <- compute_bf_mat_log(Y = Y, X = cbind(X_mat[,1]), 
+                                        Sigma = diag(N) * sigma^2, 
+                                        Tau = diag(1) * tau^2, 
+                                        Beta0 = 0 )
+
+# One variable
+for (i in 2:7){
+    marg_log_likes[i] <- compute_bf_mat_log(Y = Y, X = X_mat[,c(1,i)], 
+                                            Sigma = diag(N) * sigma^2, 
+                                            Tau = diag(2) * tau^2, 
+                                            Beta0 = c(0, 0))
+  }
+
+# Two variable
+for (i in 2:4){
+  for (j in 5:7){
+    marg_log_likes <- c(marg_log_likes,
+                        compute_bf_mat_log(Y = Y, X = X_mat[,c(1,i,j)], 
+                                            Sigma = diag(N) * sigma^2, 
+                                            Tau = diag(3) * tau^2, 
+                                            Beta0 = c(0, 0, 0)))
+  }
+}
+
+  
+emp_post_probs <- (exp(marg_log_likes) * priors) / sum(exp(marg_log_likes) * priors)
+emp_post_probs_unif <- (exp(marg_log_likes)) / sum(exp(marg_log_likes) )
+
+cbind(model = 1:16, 
+      informed_posterior = round(emp_post_probs, 3), 
+      uniform_posterior = round(emp_post_probs_unif, 3))
+
+```
+
+### 5. Run Nimble MCMC Code
+
+```{r nimble, message = F}
+############################################################
+### Stacked MCMC
+############################################################
+num_sims <- 11000
+num_burn <- 1000
+  
+sims_out <- NULL
+p <- ncol(X_mat) - 1
+
+############################################
+############### Beta 0 Model ###############
+############################################
+b0 <- nimble::nimbleCode({
+  beta0 ~ dnorm(0, sd = tau)
+  for (k in 1:p){
+    beta[k] ~ dnorm(0, sd = tau)
+  }
+  for(i in 1:N) {
+    Y[i] ~ dnorm(beta0, sd = sigma)
+  }
+})
+  
+m_b0 <- nimble::nimbleModel(b0, constants = list(N = N, tau = tau, sigma = sigma, p = p),
+                              data = list(Y = Y),
+                              inits = list(beta0 = 0, beta = rep(0,p)))
+  
+sims_b0 <- nimble::nimbleMCMC(model = m_b0, niter = num_sims, nchains = 2, 
+                              nburnin = num_burn, progressBar = F)
+
+sims_out[[1]] <- rbind(sims_b0$chain1, sims_b0$chain2)
+  
+############################################
+############### one variable model #########
+############################################
+b1 <- nimble::nimbleCode({
+  beta0 ~ dnorm(0, sd = tau)
+  for (k in 1:p){
+    beta[k] ~ dnorm(0, sd = tau)
+  }
+  for(i in 1:N) {
+    Y[i] ~ dnorm(beta0 + beta[active_id] * x[i], sd = sigma)
+    }
+})
+    
+for(i in 1:6){
+  m_b1 <- nimble::nimbleModel(b1, constants = list(N = N, tau = tau, p = p, sigma = sigma, active_id = i),
+                        data = list(Y = Y, x = X_mat[, i + 1]),
+                        inits = list(beta0 = 0, beta = rep(0,p)))
+  sims_b1 <- nimble::nimbleMCMC(model = m_b1, niter = num_sims, 
+                                nburnin = num_burn, nchains = 2, progressBar = F)
+  sims_out[[i+1]] <- rbind(sims_b1$chain1, sims_b1$chain2)
+}
+  
+############################################
+############### two variable model #############
+############################################
+b_add <- nimble::nimbleCode({
+  beta0 ~ dnorm(0, sd = tau)
+  for (k in 1:p){
+    beta[k] ~ dnorm(0, sd = tau)
+  }
+  for(i in 1:N) {
+    Y[i] ~ dnorm(beta0 + beta[active_id] * x1[i] + beta[active_id2] * x2[i], sd = sigma)
+  }
+})
+
+for (i in 1:3){
+  for (j in 4:6){
+    m_add <- nimble::nimbleModel(b_add, constants = list(N = N, tau = tau, p = p, 
+                                                     active_id = i, sigma = sigma, active_id2 = j),
+                                data = list(Y = Y, x1 = X_mat[,i + 1], x2 = X_mat[,j + 1]),
+                                inits = list(beta0 = 0, beta = rep(0,p)))
+  sims_add <- nimble::nimbleMCMC(model = m_add, niter = num_sims, 
+                               nburnin = num_burn, nchains = 2, progressBar = F)
+  sims_out[[length(sims_out) + 1]] <- rbind(sims_add$chain1, sims_add$chain2)
+  }
+}
+
+```
+
+### 6. Estimate Model Probabilities: Rao Blackwell Component
+
+```{r rb}
+Like_Stack <- array(0,dim = c(16, 16, (num_sims-num_burn) * 2, N))
+# first two dims (i,j) are simulations generated under model i 
+# to transition from the specified model j
+    
+for (i in 1:16){
+  for (j in 1:N){
+    # likelihood from model 0 for model i
+    Like_Stack[i,1,,j] <- dnorm(Y[j], mean = sims_out[[i]][,'beta0'], sd = sigma) 
+    for (k in 1:6){
+      Like_Stack[i,k+1,,j] <- dnorm(Y[j], mean = sims_out[[i]][,'beta0'] + 
+                                  sims_out[[i]][,paste('beta[',k, ']', sep = '')] * X_mat[j,k+1], sd = sigma) 
+    }
+
+    #8
+    Like_Stack[i,8,,j] <- dnorm(Y[j], mean = sims_out[[i]][,'beta0'] + 
+                                     sims_out[[i]][,'beta[1]'] * X_mat[j,2] +
+                                     sims_out[[i]][,'beta[4]'] * X_mat[j,5], sd = sigma) 
+    #9
+    Like_Stack[i,9,,j] <- dnorm(Y[j], mean = sims_out[[i]][,'beta0'] + 
+                                     sims_out[[i]][,'beta[1]'] * X_mat[j,2] +
+                                     sims_out[[i]][,'beta[5]'] * X_mat[j,6], sd = sigma) 
+    #10
+    Like_Stack[i,10,,j] <- dnorm(Y[j], mean = sims_out[[i]][,'beta0'] + 
+                                     sims_out[[i]][,'beta[1]'] * X_mat[j,2] +
+                                     sims_out[[i]][,'beta[6]'] * X_mat[j,7], sd = sigma) 
+    #11
+    Like_Stack[i,11,,j] <- dnorm(Y[j], mean = sims_out[[i]][,'beta0'] + 
+                                     sims_out[[i]][,'beta[2]'] * X_mat[j,3] +
+                                     sims_out[[i]][,'beta[4]'] * X_mat[j,5], sd = sigma) 
+    #12
+    Like_Stack[i,12,,j] <- dnorm(Y[j], mean = sims_out[[i]][,'beta0'] + 
+                                     sims_out[[i]][,'beta[2]'] * X_mat[j,3] +
+                                     sims_out[[i]][,'beta[5]'] * X_mat[j,6], sd = sigma) 
+    #13
+    Like_Stack[i,13,,j] <- dnorm(Y[j], mean = sims_out[[i]][,'beta0'] + 
+                                     sims_out[[i]][,'beta[2]'] * X_mat[j,3] +
+                                     sims_out[[i]][,'beta[6]'] * X_mat[j,7], sd = sigma) 
+    #14
+    Like_Stack[i,14,,j] <- dnorm(Y[j], mean = sims_out[[i]][,'beta0'] + 
+                                     sims_out[[i]][,'beta[3]'] * X_mat[j,4] +
+                                     sims_out[[i]][,'beta[4]'] * X_mat[j,5], sd = sigma) 
+    #15
+    Like_Stack[i,15,,j] <- dnorm(Y[j], mean = sims_out[[i]][,'beta0'] + 
+                                     sims_out[[i]][,'beta[3]'] * X_mat[j,4] +
+                                     sims_out[[i]][,'beta[5]'] * X_mat[j,6], sd = sigma) 
+    #16
+    Like_Stack[i,16,,j] <- dnorm(Y[j], mean = sims_out[[i]][,'beta0'] + 
+                                     sims_out[[i]][,'beta[3]'] * X_mat[j,4] +
+                                     sims_out[[i]][,'beta[6]'] * X_mat[j,7], sd = sigma) 
+    }
+}
+```
+    
+```{r results_out}
+rm(sims_out)
+likes <- apply(Like_Stack, c(1,2,3), prod)
+# first two dims (i,j) are simulations generated under model i 
+# to transition from the specified model j
+# the third dimension is each iteration from the RJMCMC
+  
+transition_matrix <- matrix(0,16, 16)
+  
+for (i in 1:16){
+    denom <- colSums(likes[i,,] * matrix(priors, nrow = 16 , ncol = (num_sims-num_burn) * 2)) 
+    denom_matrix <- matrix(denom, 16, (num_sims-num_burn) * 2, byrow = T) 
+    transition_matrix[i,] <- rowMeans(likes[i,,] * matrix(priors, nrow = 16 , ncol = (num_sims-num_burn) * 2) / denom_matrix)
+}
+  
+  sim_post_probs <- (abs(eigen(t(transition_matrix))$vectors[,1] )) /
+    sum(sqrt((abs(eigen(t(transition_matrix))$vectors[,1]))^2 ))
+ 
+for (i in 1:16){
+  denom <- colSums(likes[i,,])
+  denom_matrix <- matrix(denom, 16, (num_sims-num_burn) * 2, byrow = T)
+  transition_matrix[i,] <- rowMeans(likes[i,,] / denom_matrix)
+}
+  
+sim_post_probs_unif <- (abs(eigen(t(transition_matrix))$vectors[,1] )) /
+  sum(sqrt((abs(eigen(t(transition_matrix))$vectors[,1]))^2 ))
+  
+```
+
+```{r}
+results <- tibble(model = factor(1:16),
+                    truth = emp_post_probs,
+                    us =  sim_post_probs,
+                    truth_unif = emp_post_probs_unif,
+                    us_unif = sim_post_probs_unif)
+results
+```
+
