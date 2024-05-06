@@ -10,7 +10,8 @@
 #' }
 ################################################################################
 ################################################################################
-ui <- shiny::fluidPage(
+Prior_2d <- function(){
+  ui <- shiny::fluidPage(
   shiny::tags$head(
     shiny::tags$style(shiny::HTML("hr {border-top: 1px solid #000000;}"))
   ),
@@ -275,3 +276,4 @@ server <- function(input, output, session) {
 ################################################################################
 # Run the application
 shiny::shinyApp(ui = ui, server = server)
+}
