@@ -53,10 +53,10 @@ Prior_2d <- function(){
         shiny::tabPanel("Interactive Plot: Marginal Var 2",
                         shiny::plotOutput("PriorPlot2", click = "plot_click2"),
                         shiny::actionButton("exclude_reset2", "Reset Prior")),
-        shiny::tabPanel("Table: Marginal Var 1", shiny::dataTableOutput('table')),
-        shiny::tabPanel("Table: Marginal Var 2", shiny::dataTableOutput('table2')),
+        shiny::tabPanel("Table: Marginal Var 1", DT::DTOutput('table')),
+        shiny::tabPanel("Table: Marginal Var 2", DT::DTOutput('table2')),
         shiny::tabPanel("Table: Joint",
-                        shiny::dataTableOutput('tableJ'),
+                        DT::DTOutput('tableJ'),
                         shiny::actionButton("create_joint", "Create Joint Prior")),
         shiny::tabPanel("Plot: Joint Prior", shiny::plotOutput("JointPrior"))
       )
@@ -221,9 +221,9 @@ server <- function(input, output, session) {
            subtitle = 'Note: 0 distance implies no meaningful effect')
   })
   ################################################################################
-  output$table <- shiny::renderDataTable({prior_table()|> dplyr::arrange(`Var1: distance (km)`)})
-  output$table2 <- shiny::renderDataTable({prior_table2()|> dplyr::arrange(`Var2: distance (km)`)})
-  output$tableJ <- shiny::renderDataTable({prior_tableJ()})
+  output$table <- DT::renderDT({prior_table()|> dplyr::arrange(`Var1: distance (km)`)})
+  output$table2 <- DT::renderDT({prior_table2()|> dplyr::arrange(`Var2: distance (km)`)})
+  output$tableJ <- DT::renderDT({prior_tableJ()})
 
   ################################################################################
   output$downloadPrior <- shiny::downloadHandler(
