@@ -6,9 +6,6 @@
 \usage{
 Prior_2d()
 }
-\value{
-opens Shiny app for elicitation of 2d prior
-}
 \description{
 Generate 2d Shiny elicitation app
 }

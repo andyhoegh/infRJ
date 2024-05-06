@@ -1,6 +1,5 @@
 #' Generate 2d Shiny elicitation app
 #'
-#' @return opens Shiny app for elicitation of 2d prior
 #' @export
 #'
 #' @examples
