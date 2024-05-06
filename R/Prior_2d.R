@@ -1,8 +1,18 @@
+#' Generate 2d Shiny elicitation app
+#'
+#'
+#' @return opens Shiny app
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' Prior_2d()
+#' }
 ################################################################################
 ################################################################################
 ui <- shiny::fluidPage(
   shiny::tags$head(
-    shiny::tags$style(HTML("hr {border-top: 1px solid #000000;}"))
+    shiny::tags$style(shiny::HTML("hr {border-top: 1px solid #000000;}"))
   ),
   shiny::titlePanel("Scale Selection Prior Elicitation: 2d"),
 
@@ -55,6 +65,7 @@ ui <- shiny::fluidPage(
   ))
 ################################################################################
 ################################################################################
+
 server <- function(input, output, session) {
 
   prior_table <- shiny::reactiveVal(
@@ -65,19 +76,19 @@ server <- function(input, output, session) {
     tibble::tibble(`Var2: distance (km)` = 0, `Prior Probability` = .5)
   )
 
-  prior_tableJ <- shiny::reactiveVal(tibble(`Var1: distance (km)` = 0,
+  prior_tableJ <- shiny::reactiveVal(tibble::tibble(`Var1: distance (km)` = 0,
                                      `Var2: distance (km)` = 0,
                                      `Joint Probability` = .4))
   ################################################################################
 
   shiny::observeEvent(input$prob_effect,  {
     if (nrow(prior_table()) > 1){
-      unif_dist <- prior_table() %>% dplyr::slice(2:n())
+      unif_dist <- prior_table() |> dplyr::slice(2:dplyr::n())
 
       zero_val <- tibble::tibble(`Var1: distance (km)` = 0,
                                  `Prior Probability` = 1 - input$prob_effect/100)
 
-      start_dist <- zero_val %>% dplyr::bind_rows(unif_dist)
+      start_dist <- zero_val |> dplyr::bind_rows(unif_dist)
       prior_table(start_dist)
       prior_tableJ(tibble::tibble(tidyr::expand_grid(prior_table(), prior_table2()|>
                                         dplyr::rename(`Prior Probability2` = `Prior Probability`))|>
@@ -93,12 +104,12 @@ server <- function(input, output, session) {
 
   shiny::observeEvent(input$prob_effect2,  {
     if (nrow(prior_table2()) > 1){
-      unif_dist <- prior_table2() %>% dplyr::slice(2:n())
+      unif_dist <- prior_table2() |> dplyr::slice(2:dplyr::n())
 
       zero_val <- tibble::tibble(`Var2: distance (km)` = 0,
                                  `Prior Probability` = 1 - input$prob_effect2/100)
 
-      start_dist <- zero_val %>% dplyr::bind_rows(unif_dist)
+      start_dist <- zero_val |> dplyr::bind_rows(unif_dist)
       prior_table2(start_dist)
       prior_tableJ(tibble::tibble(tidyr::expand_grid(prior_table(), prior_table2()|>
                                         dplyr::rename(`Prior Probability2` = `Prior Probability`))|>
@@ -118,11 +129,11 @@ server <- function(input, output, session) {
     new_val <- shiny::nearPoints(prior_table(), input$plot_click, threshold = 1000, maxpoints = 1)
     new_row <- tibble::tibble(`Var1: distance (km)` = new_val$`Var1: distance (km)`,
                       `Prior Probability` = input$plot_click$y)
-    tmp <- prior_table() %>%
-      dplyr::filter(`Var1: distance (km)` != new_val$`Var1: distance (km)`) %>%
+    tmp <- prior_table() |>
+      dplyr::filter(`Var1: distance (km)` != new_val$`Var1: distance (km)`) |>
       dplyr::bind_rows(new_row)
-    prior_table(prior_table() %>%
-                  dplyr::filter(`Var1: distance (km)` != new_val$`Var1: distance (km)`) %>%
+    prior_table(prior_table() |>
+                  dplyr::filter(`Var1: distance (km)` != new_val$`Var1: distance (km)`) |>
                   dplyr::bind_rows(new_row)|>
                   dplyr::mutate(`Prior Probability` = `Prior Probability` / sum(tmp$`Prior Probability`)))
     prior_tableJ(tibble::tibble(tidyr::expand_grid(prior_table(), prior_table2()|>
@@ -135,14 +146,14 @@ server <- function(input, output, session) {
     new_val <- shiny::nearPoints(prior_table2(), input$plot_click2, threshold = 1000, maxpoints = 1)
     new_row <- tibble::tibble(`Var2: distance (km)` = new_val$`Var2: distance (km)`,
                       `Prior Probability` = input$plot_click2$y)
-    tmp <- prior_table2() %>%
-      dplyr::filter(`Var2: distance (km)` != new_val$`Var2: distance (km)`) %>%
+    tmp <- prior_table2() |>
+      dplyr::filter(`Var2: distance (km)` != new_val$`Var2: distance (km)`) |>
       dplyr::bind_rows(new_row)
-    prior_table2(prior_table2() %>%
-                   dplyr::filter(`Var2: distance (km)` != new_val$`Var2: distance (km)`) %>%
+    prior_table2(prior_table2() |>
+                   dplyr::filter(`Var2: distance (km)` != new_val$`Var2: distance (km)`) |>
                    dplyr::bind_rows(new_row)|>
                    dplyr::mutate(`Prior Probability` = `Prior Probability` / sum(tmp$`Prior Probability`)))
-    prior_tableJ(tibble::tibble(expand_grid(prior_table(), prior_table2()|>
+    prior_tableJ(tibble::tibble(tidyr::expand_grid(prior_table(), prior_table2()|>
                                       dplyr::rename(`Prior Probability2` = `Prior Probability`))|>
                           dplyr::mutate(`Joint Probability` = `Prior Probability2` * `Prior Probability`) |>
                           dplyr::select(-`Prior Probability2`, -`Prior Probability`)))
@@ -169,10 +180,10 @@ server <- function(input, output, session) {
   })
   ################################################################################
   output$PriorPlot <- shiny::renderPlot({
-    prior_table() %>%
-      ggplot2::ggplot(aes(x = `Var1: distance (km)`, y = `Prior Probability`)) +
+    prior_table() |>
+      ggplot2::ggplot(ggplot2::aes(x = `Var1: distance (km)`, y = `Prior Probability`)) +
       ggplot2::geom_point() +
-      ggplot2::geom_segment( aes(x=`Var1: distance (km)`, xend=`Var1: distance (km)`,
+      ggplot2::geom_segment( ggplot2::aes(x=`Var1: distance (km)`, xend=`Var1: distance (km)`,
                         y=0, yend=`Prior Probability`))+
       ggplot2::theme_bw() +
       ggplot2::xlab('distance (km)') +
@@ -183,10 +194,10 @@ server <- function(input, output, session) {
   })
 
   output$PriorPlot2 <- shiny::renderPlot({
-    prior_table2() %>%
-      ggplot2::ggplot(aes(x = `Var2: distance (km)`, y = `Prior Probability`)) +
+    prior_table2() |>
+      ggplot2::ggplot(ggplot2::aes(x = `Var2: distance (km)`, y = `Prior Probability`)) +
       ggplot2::geom_point() +
-      ggplot2::geom_segment( aes(x=`Var2: distance (km)`, xend=`Var2: distance (km)`,
+      ggplot2::geom_segment( ggplot2::aes(x=`Var2: distance (km)`, xend=`Var2: distance (km)`,
                         y=0, yend=`Prior Probability`))+
       ggplot2::theme_bw() +
       ggplot2::xlab('distance (km)') +
@@ -197,13 +208,13 @@ server <- function(input, output, session) {
   })
 
   output$JointPrior <- shiny::renderPlot({
-    prior_tableJ() %>%
+    prior_tableJ() |>
       dplyr::mutate(lab = round(`Joint Probability`,2)) |>
-      ggplot2::ggplot(aes(x = `Var2: distance (km)`, y = `Var1: distance (km)`,
+      ggplot2::ggplot(ggplot2::aes(x = `Var2: distance (km)`, y = `Var1: distance (km)`,
                  size = `Joint Probability`, color = `Joint Probability`)) +
       ggplot2::geom_point( size = 12) +
       ggplot2::scale_color_gradient(low = "yellow", high = "red", na.value = NA)   +
-      ggplot2::geom_text(aes(label = lab), size = 5, color = "black") +
+      ggplot2::geom_text(ggplot2::aes(label = lab), size = 5, color = "black") +
       ggplot2::theme_bw() +
       ggplot2::xlab('Variable 1') +
       ggplot2::ylab('Variable 2') +
@@ -225,17 +236,17 @@ server <- function(input, output, session) {
     })
   ################################################################################
   shiny::observeEvent(input$add_data, {
-    prior_table() %>%
+    prior_table() |>
       dplyr::add_row(
         `Var1: distance (km)` = input$distance,
         `Prior Probability` = input$probability,
-      ) %>%
+      ) |>
       prior_table()
-    prior_table2() %>%
+    prior_table2() |>
       dplyr::add_row(
         `Var2: distance (km)` = input$distance,
         `Prior Probability` = input$probability2,
-      ) %>%
+      ) |>
       prior_table2()
     prior_tableJ(tibble::tibble(tidyr::expand_grid(prior_table(), prior_table2()|>
                                       dplyr::rename(`Prior Probability2` = `Prior Probability`))|>
@@ -246,9 +257,9 @@ server <- function(input, output, session) {
 
   ################################################################################
   shiny::observeEvent(input$normalize, {
-    prior_table(prior_table() %>%
+    prior_table(prior_table() |>
                   dplyr::mutate(`Prior Probability` = `Prior Probability` / sum(`Prior Probability`)))
-    prior_table2(prior_table2() %>%
+    prior_table2(prior_table2() |>
                    dplyr::mutate(`Prior Probability` = `Prior Probability` / sum(`Prior Probability`)))
 
 

@@ -17,8 +17,11 @@ Suggests:
 Config/testthat/edition: 3
 Imports: 
     dplyr,
+    ggplot2,
     rgee,
-    tibble
+    shiny,
+    tibble,
+    tidyr
 URL: https://github.com/andyhoegh/infRJ
 BugReports: https://github.com/andyhoegh/infRJ/issues
 VignetteBuilder: knitr
