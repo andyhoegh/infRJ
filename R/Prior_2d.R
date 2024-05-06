@@ -223,7 +223,7 @@ server <- function(input, output, session) {
   ################################################################################
   output$table <- DT::renderDT({prior_table()|> dplyr::arrange(`Var1: distance (km)`)})
   output$table2 <- DT::renderDT({prior_table2()|> dplyr::arrange(`Var2: distance (km)`)})
-  output$tableJ <- DT::renderDT({prior_tableJ()})
+  output$tableJ <- DT::renderDT({prior_tableJ()|> dplyr::arrange(`Var1: distance (km)`, `Var2: distance (km)`)})
 
   ################################################################################
   output$downloadPrior <- shiny::downloadHandler(
