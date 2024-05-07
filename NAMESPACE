@@ -2,3 +2,4 @@
 
 export(Prior_2d)
 export(extract_landuse)
+export(run_nimble)

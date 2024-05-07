@@ -16,9 +16,13 @@ Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 Imports: 
+    doParallel,
     dplyr,
     DT,
+    foreach,
     ggplot2,
+    nimble,
+    parallel,
     rgee,
     shiny,
     tibble,
