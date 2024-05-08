@@ -27,7 +27,7 @@ run_nimble <- function(Y, X_mat, code_in, constants_in, data_in, tau_in, sigma_i
   doParallel::registerDoParallel(cl = cluster)
 
   sims_out <- foreach::foreach(
-    i = 1:16,
+    i = 1:num_models,
     .packages = c('nimble')
   ) %dopar% {
     nimble_model <- nimble::nimbleModel(code_in[[i]],
