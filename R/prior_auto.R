@@ -5,7 +5,7 @@
 #'
 #' @examples
 #' \dontrun{
-#' Prior_2d()
+#' prior_auto()
 #' }
 prior_auto <- function(){
   ui <- shiny::fluidPage(

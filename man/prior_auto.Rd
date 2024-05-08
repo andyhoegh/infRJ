@@ -14,6 +14,6 @@ opens shiny app
 }
 \examples{
 \dontrun{
-Prior_2d()
+prior_auto()
 }
 }
