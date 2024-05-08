@@ -3,4 +3,5 @@
 export(Prior_2d)
 export(combine_nimble)
 export(extract_landuse)
+export(prior_auto)
 export(run_nimble)
