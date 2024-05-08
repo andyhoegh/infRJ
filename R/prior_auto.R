@@ -50,7 +50,7 @@ prior_auto <- function(){
           shiny::tabPanel("Plot",
                           shiny::plotOutput("PriorPlot", click = "plot_click"),
                           shiny::actionButton("exclude_reset", "Reset Prior")),
-          shiny::tabPanel("Table", shiny::dataTableOutput('table'))
+          shiny::tabPanel("Table", DT::DTOutput('table'))
         )
       )
     )
@@ -185,7 +185,7 @@ prior_auto <- function(){
              caption = 'Click to adjust priors. The click will recognize the nearest point.')
     })
 
-    output$table <- shiny::renderDataTable({prior_table()|> dplyr::arrange(`distance (km)`)})
+    output$table <- DT::renderDT()({prior_table()|> dplyr::arrange(`distance (km)`)})
 
 
     output$downloadPrior <- shiny::downloadHandler(
